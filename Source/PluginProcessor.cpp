@@ -9,6 +9,9 @@ public:
                 .withInput("Input", juce::AudioChannelSet::stereo(), true)
                 .withOutput("Output", juce::AudioChannelSet::stereo(), true))
     {
+        // The volume slider: ID, name, min, max, default.
+        addParameter(gainParam = new juce::AudioParameterFloat(
+            juce::ParameterID("gain", 1), "Volume", 0.0f, 1.0f, 0.5f));
     }
 
     void prepareToPlay(double, int) override {}
@@ -32,8 +35,7 @@ public:
     {
         juce::ScopedNoDenormals noDenormals;
 
-        float gain = 0.5f;
-        buffer.applyGain(gain);
+        buffer.applyGain(gainParam->get());
     }
 
     // Information the DAW needs about our plugin.
@@ -45,11 +47,12 @@ public:
 
     double getTailLengthSeconds() const override { return 0.0; }
 
-    bool hasEditor() const override { return false; }
+    // Show a window with a slider for every parameter.
+    bool hasEditor() const override { return true; }
 
     juce::AudioProcessorEditor* createEditor() override
     {
-        return nullptr;
+        return new juce::GenericAudioProcessorEditor(*this);
     }
 
     int getNumPrograms() override { return 1; }
@@ -63,8 +66,21 @@ public:
 
     void changeProgramName(int, const juce::String&) override {}
 
-    void getStateInformation(juce::MemoryBlock&) override {}
-    void setStateInformation(const void*, int) override {}
+    // Save and load the slider position (so FL Studio remembers it).
+    void getStateInformation(juce::MemoryBlock& destData) override
+    {
+        juce::MemoryOutputStream stream(destData, true);
+        stream.writeFloat(gainParam->get());
+    }
+
+    void setStateInformation(const void* data, int sizeInBytes) override
+    {
+        juce::MemoryInputStream stream(data, static_cast<size_t>(sizeInBytes), false);
+        *gainParam = stream.readFloat();
+    }
+
+private:
+    juce::AudioParameterFloat* gainParam = nullptr;
 };
 
 // JUCE calls this to create an instance of our plugin.
